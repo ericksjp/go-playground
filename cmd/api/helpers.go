@@ -2,8 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"net/http"
+	"fmt"
 	"maps"
+	"net/http"
+	"strconv"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 // this will add additional layer of abstraction to the json response
@@ -28,3 +32,16 @@ func (app *application) WriteJSON(w http.ResponseWriter, status int, data envelo
 	return nil
 }
 
+func (app *application) readIDParam(r *http.Request) (int64, error) {
+	// get the params from the request context (the context is a way to provide data across the requests)
+	params := httprouter.ParamsFromContext(r.Context())
+
+	// get the id from the params and try to convert it to int64
+	id, err := strconv.ParseInt(params.ByName("id"), 10, 64)
+
+	if err != nil || id < 1 {
+		return 0, fmt.Errorf("invalid id parameter")
+	}
+
+	return id, nil
+}
