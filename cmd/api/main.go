@@ -23,9 +23,14 @@ type application struct {
 
 // healthCheckHandler responds to /v1/healthcheck with a JSON object
 func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Request)  {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status": %q, "env": %q, "version": %q}`, "available", app.config.env, version)
+	data := envelope{
+		"status": "available",
+		"system_info": map[string]string{
+			"version": version,
+			"env": app.config.env,
+		},
+	}
+	app.WriteJSON(w, 200, data, nil)
 }
 
 func main() {
