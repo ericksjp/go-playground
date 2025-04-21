@@ -23,14 +23,9 @@ func (app * application) showMovieHandler(w http.ResponseWriter, _ *http.Request
 	// // the json is created and written in one single step
 	// err := json.NewEncoder(w).Encode(movie)
 
-	js, err := movie.MarshalJSON()
-
+	err := app.WriteJSON(w, 200, envelope{"movie": movie}, nil)
 	if err != nil {
 		http.Error(w, "The server could not process your request", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(js)
 }
