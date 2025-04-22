@@ -7,7 +7,21 @@ import (
 	"github.com/ericksjp703/greenlight/internal/data"
 )
 
-// func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request)  {}
+func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request)  {
+	var movie data.Movie
+
+	err := app.readJSON(w, r, &movie)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = app.WriteJSON(w, http.StatusCreated, envelope{"movie": movie}, nil)
+	if err != nil {
+		http.Error(w, "The server could not process your request", http.StatusInternalServerError)
+		return
+	}
+}
 
 func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request)  {
 	// get the id from the request
