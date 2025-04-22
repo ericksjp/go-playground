@@ -1,0 +1,47 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+// helper to use the app logger to log errors
+func (app *application) logError(err error) {
+	app.logger.Println(err)
+}
+
+// generic error response
+// this basically will just envelope the error message with "error" and send
+// a status 500 to the client if the error cannot be written to the response
+func (app *application) errorResponse(w http.ResponseWriter, _ *http.Request, status int, message any) {
+	err := app.WriteJSON(w, status, envelope{"error": message}, nil)
+
+	if err != nil {
+		app.logError(err)
+		w.WriteHeader(500)
+	}
+}
+
+// specific for 500 internal server error
+func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
+	app.logError(err)
+	message := "the server encountered a problem and could not process your request"
+	app.errorResponse(w, r, http.StatusInternalServerError, message)
+}
+
+// specific for 404 not found
+func (app *application) notFoundResponse(w http.ResponseWriter, r *http.Request) {
+	message := "the requested resource could not be found"
+	app.errorResponse(w, r, http.StatusNotFound, message)
+}
+
+// specific for 405 method not allowed
+func (app *application) methodNotAllowedResponse(w http.ResponseWriter, r *http.Request) {
+	message := fmt.Sprintf("the %s method is not supported for this resource", r.Method)
+	app.errorResponse(w, r, http.StatusMethodNotAllowed, message)
+}
+
+// specific for 400 bad request
+func (app *application) badRequestResponse(w http.ResponseWriter, r *http.Request, err error)  {
+	app.errorResponse(w, r, http.StatusBadRequest, err.Error())
+}

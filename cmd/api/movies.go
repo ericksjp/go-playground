@@ -12,13 +12,13 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 	err := app.readJSON(w, r, &movie)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
 	err = app.WriteJSON(w, http.StatusCreated, envelope{"movie": movie}, nil)
 	if err != nil {
-		http.Error(w, "The server could not process your request", http.StatusInternalServerError)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 }
@@ -27,7 +27,7 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 	// get the id from the request
 	id, err := app.readIDParam(r);
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFoundResponse(w, r)
 		return
 	}
 
@@ -46,7 +46,7 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 
 	err = app.WriteJSON(w, 200, envelope{"movie": movie}, nil)
 	if err != nil {
-		http.Error(w, "The server could not process your request", http.StatusInternalServerError)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 }
