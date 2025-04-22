@@ -30,7 +30,7 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 			"env": app.config.env,
 		},
 	}
-	app.WriteJSON(w, 200, data, nil)
+	app.writeJSON(w, 200, data, nil)
 }
 
 func main() {

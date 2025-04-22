@@ -16,7 +16,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.WriteJSON(w, http.StatusCreated, envelope{"movie": movie}, nil)
+	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -44,7 +44,7 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 	// // the json is created and written in one single step
 	// err := json.NewEncoder(w).Encode(movie)
 
-	err = app.WriteJSON(w, 200, envelope{"movie": movie}, nil)
+	err = app.writeJSON(w, 200, envelope{"movie": movie}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

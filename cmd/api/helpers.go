@@ -17,7 +17,7 @@ import (
 // "movie": {...}
 type envelope map[string]any
 
-func (app *application) WriteJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
+func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
 	// encode the data to json, return error
 	js ,err := json.Marshal(data)
 	if err != nil {

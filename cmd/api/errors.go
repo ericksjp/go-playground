@@ -14,7 +14,7 @@ func (app *application) logError(err error) {
 // this basically will just envelope the error message with "error" and send
 // a status 500 to the client if the error cannot be written to the response
 func (app *application) errorResponse(w http.ResponseWriter, _ *http.Request, status int, message any) {
-	err := app.WriteJSON(w, status, envelope{"error": message}, nil)
+	err := app.writeJSON(w, status, envelope{"error": message}, nil)
 
 	if err != nil {
 		app.logError(err)
