@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/ericksjp703/greenlight/internal/data"
 )
 
 const version = "1.0.0"
@@ -34,6 +36,9 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func main() {
+
+	// initialize the singletown instance
+	data.GetMoviesStore()
 
 	// gettin cmd args
 	var cfg config

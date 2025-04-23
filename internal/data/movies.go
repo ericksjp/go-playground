@@ -39,4 +39,6 @@ func (m Movie) Validate(v *validator.Validator)  {
 
 	v.Check(m.Version == 0, "version", "must be provided")
 	v.Check(m.Version < 0, "version", "must be a positive integer")
+
+	v.Check(m.ID != 0, "id", "must be empty")
 }
