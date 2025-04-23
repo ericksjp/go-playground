@@ -54,6 +54,51 @@ func (ms *MoviesStore) GetMovie(id int64) (Movie, error) {
 	return movie, nil
 }
 
+// Allows multiple concurrent reads.
+// Blocks if a write lock is held by another goroutine.
+func (ms *MoviesStore) GetAllMovies() []Movie {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	movies := make([]Movie, 0, len(ms.movies))
+	for _, movie := range ms.movies {
+		movies = append(movies, movie)
+	}
+
+	return movies
+}
+
+// Blocks if a write/read lock is held by another goroutine.
+func (ms *MoviesStore) UpdateMovie(id int64, movie *Movie) error {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
+	_, ok := ms.movies[id]
+	if !ok {
+		return ErrMovieNotFound
+	}
+
+	ms.movies[movie.ID] = *movie
+
+	return nil
+}
+
+
+// Blocks if a write/read lock is held by another goroutine.
+func (ms *MoviesStore) DeleteMovie(id int64) error {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
+	_, ok := ms.movies[id]
+	if !ok {
+		return ErrMovieNotFound
+	}
+
+	delete(ms.movies, id)
+
+	return nil
+}
+
 // ------------------ helpers
 
 func (ms *MoviesStore) nextID() int64 {
