@@ -18,28 +18,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	v := validator.New()
-
-	// the check function will preserve the first error.
-	// In the case of title, if both checks are true, "must be provided" will
-	// be on the map
-	v.Check(movie.Title == "", "title", "must be provided")
-	v.Check(len(movie.Title) > 500, "title", "must not be more than 500 characters long")
-
-	v.Check(movie.Year == 0, "year", "must be provided")
-	v.Check(movie.Year < 1988, "year", "must be greater than 1988")
-	v.Check(movie.Year > int32(time.Now().Year()), "year", "must not be in the future")
-
-	v.Check(movie.Runtime == 0, "runtime", "must be provided")
-	v.Check(movie.Runtime < 1, "runtime", "must be a positive integer")
-
-	v.Check(movie.Genres == nil, "genres", "must be provided")
-	v.Check(len(movie.Genres) == 0, "genres", "must contain at least 1 genre")
-	v.Check(len(movie.Genres) > 5, "genres", "must not be more than 5 genres")
-	v.Check(!validator.Unique(movie.Genres), "genres", "must not contain duplicate genres")
-	v.Check(validator.In("anime", movie.Genres), "genres", "we dont accept animes, thank you")
-
-	v.Check(movie.Version == 0, "version", "must be provided")
-	v.Check(movie.Version < 0, "version", "must be a positive integer")
+	movie.Validate(v);
 
 	if !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
