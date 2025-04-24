@@ -23,9 +23,13 @@ const version = "1.0.0"
 
 type config struct {
 	port int
-	env string
-	db struct {
-		dns string
+	env  string
+	db   struct {
+		dns             string
+		maxOpenConns    int
+		maxIdleConns    int
+		maxIdleTime     string
+		maxLifetime 	string
 	}
 }
 
@@ -55,7 +59,14 @@ func main() {
 	var cfg config
 	flag.IntVar(&cfg.port, "port", 4000, "api port")
 	flag.StringVar(&cfg.env, "env", "development", "api env (development|staging|production)")
+
+	// db config
 	flag.StringVar(&cfg.db.dns, "db-dns", "postgres://postgres:postgres@localhost/postgres", "postgresql dns")
+	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
+	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
+	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
+	flag.StringVar(&cfg.db.maxLifetime, "db-max-lifetime", "0m", "PostgreSQL max connection lifetime")
+
 	flag.Parse()
 
 	// server logger
@@ -96,6 +107,23 @@ func openDB(cfg *config) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// set the maximum number of open connections (both idle and in-use) allowed in the connection pool
+	db.SetMaxOpenConns(cfg.db.maxOpenConns);
+	// set the maximum number of idle connections allowed in the connection pool
+	db.SetMaxIdleConns(cfg.db.maxIdleConns);
+	// set the maximum duration a connection can remain idle in the pool before being closed
+	duration, err := time.ParseDuration(cfg.db.maxIdleTime)
+	if err != nil {
+		return nil, err
+	}
+	db.SetConnMaxIdleTime(duration);
+	// set the maximum lifetime of a connection in the pool, after which it will be closed and removed
+	duration, err = time.ParseDuration(cfg.db.maxLifetime)
+	if err != nil {
+		return nil, err
+	}
+	db.SetConnMaxLifetime(duration);
 
 	// Creates a context with a 5-second timeout, ensuring PingContext cancels
 	// if the connection is not established within that time
