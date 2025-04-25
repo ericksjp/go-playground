@@ -36,6 +36,7 @@ type config struct {
 type application struct {
 	config config
 	logger *log.Logger
+	models data.Models
 }
 
 // healthCheckHandler responds to /v1/healthcheck with a JSON object
@@ -65,9 +66,6 @@ func getenvAsInt(key string) int {
 }
 
 func main() {
-
-	// initialize the singletown instance
-	data.GetMoviesStore()
 
 	// gettin cmd args
 	var cfg config
@@ -100,6 +98,7 @@ func main() {
 	app := &application{
 		config: cfg,
 		logger: logger,
+		models: data.NewModels(db),
 	}
 
 	// server instance

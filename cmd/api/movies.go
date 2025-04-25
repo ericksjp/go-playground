@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/ericksjp703/greenlight/internal/data"
@@ -24,7 +25,11 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	movie = data.GetMoviesStore().AddMovie(movie)
+	err = app.models.Movies.Insert(&movie);
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
 
 	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, nil)
 	if err != nil {
@@ -41,10 +46,13 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	movie, err := data.GetMoviesStore().GetMovie(id)
+	movie, err := app.models.Movies.Get(id)
 	if err != nil {
-		app.notFoundResponse(w, r)
-		return
+		if errors.Is(err, data.ErrRecordNotFound) {
+			app.notFoundResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
 	}
 
 	// // the json is created and written in one single step
@@ -57,23 +65,15 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (app *application) showMoviesHandler(w http.ResponseWriter, r *http.Request)  {
-	movies := data.GetMoviesStore().GetAllMovies()
-
-	err := app.writeJSON(w, http.StatusOK, envelope{"movies": movies}, nil)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-	}
-}
-
-
 func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request)  {
+	// get and validate user id
 	id, err := app.readIDParam(r);
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
 	}
 
+	// parse json
 	var movie data.Movie
 	err = app.readJSON(w, r, &movie)
 	if err != nil {
@@ -81,21 +81,27 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// validate movie
 	v := validator.New()
 	movie.Validate(v);
 	if !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
+	movie.ID = id
 
-	err = data.GetMoviesStore().UpdateMovie(id, &movie)
+	// update
+	err = app.models.Movies.Update(&movie)
 	if err != nil {
-		app.notFoundResponse(w, r)
+		if errors.Is(err, data.ErrRecordNotFound) {
+			app.notFoundResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	movie.ID = id
-
+	// writ response
 	err = app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
@@ -110,9 +116,13 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = data.GetMoviesStore().DeleteMovie(id)
+	err = app.models.Movies.Delete(id)
 	if err != nil {
-		app.notFoundResponse(w, r)
+		if errors.Is(err, data.ErrRecordNotFound) {
+			app.notFoundResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
