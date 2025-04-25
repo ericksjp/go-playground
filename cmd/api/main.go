@@ -8,8 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
-
 
 	// for some reason the pq driver needs to be registered with the sql
 	// package in order to work. so it has a init function only for this
@@ -50,6 +50,20 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 	app.writeJSON(w, 200, data, nil)
 }
 
+func getenvAsInt(key string) int {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		log.Fatalf("the environment variable '%s' should be specified", key)
+	}
+
+	intVal, err := strconv.Atoi(value);
+	if err != nil {
+		log.Fatalf("the environment variable '%s' should be an integer", key)
+	}
+
+	return intVal
+}
+
 func main() {
 
 	// initialize the singletown instance
@@ -57,15 +71,17 @@ func main() {
 
 	// gettin cmd args
 	var cfg config
-	flag.IntVar(&cfg.port, "port", 4000, "api port")
-	flag.StringVar(&cfg.env, "env", "development", "api env (development|staging|production)")
 
-	// db config
-	flag.StringVar(&cfg.db.dns, "db-dns", "postgres://postgres:postgres@localhost/postgres", "postgresql dns")
-	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
-	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
-	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
-	flag.StringVar(&cfg.db.maxLifetime, "db-max-lifetime", "0m", "PostgreSQL max connection lifetime")
+	// Load command-line flags with environment variable defaults
+	flag.IntVar(&cfg.port, "port", getenvAsInt("PORT"), "api port")
+	flag.StringVar(&cfg.env, "env", os.Getenv("ENV"), "api env (development|staging|production)")
+
+	// Database configuration
+	flag.StringVar(&cfg.db.dns, "db-dns", os.Getenv("DB_DNS"), "postgresql dns")
+	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", getenvAsInt("DB_MAX_OPEN_CONNS"), "PostgreSQL max open connections")
+	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", getenvAsInt("DB_MAX_IDLE_CONNS"), "PostgreSQL max idle connections")
+	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", os.Getenv("DB_MAX_IDLE_TIME"), "PostgreSQL max connection idle time")
+	flag.StringVar(&cfg.db.maxLifetime, "db-max-lifetime", os.Getenv("DB_MAX_LIFETIME"), "PostgreSQL max connection lifetime")
 
 	flag.Parse()
 
