@@ -55,6 +55,7 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 			return
 		}
 		app.serverErrorResponse(w, r, err)
+		return
 	}
 
 	// // the json is created and written in one single step
