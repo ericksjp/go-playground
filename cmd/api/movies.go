@@ -9,7 +9,17 @@ import (
 )
 
 func (app *application) listMoviesHanlder(w http.ResponseWriter, r *http.Request) {
-	movies, err :=  app.models.Movies.List()
+	var input struct {
+		Title string
+		Genres []string
+	}
+
+	qs := r.URL.Query()
+
+	input.Title = app.readString(qs, "title", "")
+	input.Genres = app.readCSV(qs, "genres", []string{})
+
+	movies, err :=  app.models.Movies.List(input.Title, input.Genres)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
