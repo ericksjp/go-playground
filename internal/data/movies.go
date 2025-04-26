@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -36,19 +37,26 @@ func (m MovieModel) Insert(movie *Movie) error {
 	// pq.Array adapts a string[] to pq.StringArray
 	args := []any{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// executes the query string using the args and assign the return values to
 	// some movie camps
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (m MovieModel) Get(id int64) (*Movie, error) {
 	var movie Movie
 	query := `
-		SELECT id, title, year, runtime, genres, release, created_at FROM movies
+		SELECT pg_sleep(10), id, title, year, runtime, genres, release, created_at FROM movies
 		WHERE id = $1
 	`
 
-	err := m.DB.QueryRow(query, id).Scan(
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, id).Scan(
+		&[]byte{},
 		&movie.ID,
 		&movie.Title,
 		&movie.Year,
@@ -85,7 +93,10 @@ func (m MovieModel) Update(movie *Movie) error {
 		movie.Version,
 	}
 
-	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrEditConflict
@@ -99,8 +110,11 @@ func (m MovieModel) Update(movie *Movie) error {
 func (m MovieModel) Delete(id int64) error {
 	query := `DELETE FROM movies WHERE id = $1;`
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// the Exec() method return a sql.Result object
-	result, err := m.DB.Exec(query, id)
+	result, err := m.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
