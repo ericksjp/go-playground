@@ -27,6 +27,49 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
+func (m MovieModel) List() ([]*Movie, error) {
+	query := `
+		SELECT id, title, year, runtime, genres, release, created_at
+		FROM movies
+		ORDER BY id`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	movies := []*Movie{}
+
+	for rows.Next() {
+		var movie Movie
+
+		err := rows.Scan(
+			&movie.ID,
+			&movie.Title,
+			&movie.Year,
+			&movie.Runtime,
+			pq.Array(&movie.Genres),
+			&movie.Version,
+			&movie.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		movies = append(movies, &movie)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return movies, nil
+}
+
 func (m MovieModel) Insert(movie *Movie) error {
 	query := `
 		INSERT INTO movies (title, year, runtime, genres)

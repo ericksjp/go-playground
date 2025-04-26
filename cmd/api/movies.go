@@ -8,6 +8,20 @@ import (
 	"github.com/ericksjp703/greenlight/internal/validator"
 )
 
+func (app *application) listMoviesHanlder(w http.ResponseWriter, r *http.Request) {
+	movies, err :=  app.models.Movies.List()
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"movies": movies}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+}
+
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request)  {
 	var input data.MovieInput
 
