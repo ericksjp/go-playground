@@ -9,29 +9,29 @@ import (
 )
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request)  {
-	var movie data.Movie
+	var input data.Movie
 
-	err := app.readJSON(w, r, &movie)
+	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
-	movie.Validate(v);
+	input.Validate(v);
 
 	if !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	err = app.models.Movies.Insert(&movie);
+	err = app.models.Movies.Insert(&input);
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, nil)
+	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": input}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -39,7 +39,6 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request)  {
-	// get the id from the request
 	id, err := app.readIDParam(r);
 	if err != nil {
 		app.notFoundResponse(w, r)
@@ -66,32 +65,35 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request)  {
-	// get and validate user id
 	id, err := app.readIDParam(r);
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
 	}
 
-	// parse json
-	var movie data.Movie
-	err = app.readJSON(w, r, &movie)
+	var input data.Movie;
+	err = app.readJSON(w, r, &input);
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	// validate movie
 	v := validator.New()
-	movie.Validate(v);
+
+	// allow optional values if the method is patch
+	if r.Method == "PATCH" {
+		input.Validate(v, "Title", "Genres", "Runtime", "Year")
+	} else {
+		input.Validate(v)
+	}
+
 	if !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
-	movie.ID = id
+	input.ID = &id
 
-	// update
-	err = app.models.Movies.Update(&movie)
+	err = app.models.Movies.Update(&input)
 	if err != nil {
 		if errors.Is(err, data.ErrRecordNotFound) {
 			app.notFoundResponse(w, r)
@@ -101,8 +103,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// writ response
-	err = app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"movie": input}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

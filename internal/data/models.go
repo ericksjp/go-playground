@@ -2,7 +2,10 @@ package data
 
 import (
 	"database/sql"
+	"errors"
 )
+
+var ErrRecordNotFound = errors.New("record not found")
 
 // struct that will hold models of our application
 type Models struct {

@@ -2,71 +2,46 @@ package data
 
 import (
 	"database/sql"
-	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ericksjp703/greenlight/internal/validator"
 	"github.com/lib/pq"
 )
 
-var ErrRecordNotFound = errors.New("record not found")
+const movieInputSize = 4
 
 type Movie struct {
-	ID        int64     `json:"id"`
-	CreatedAt time.Time `json:"-"`
-	Title     string    `json:"title"`
-	Year      int32     `json:"year,omitempty"`
-	Runtime   Runtime   `json:"runtime,omitempty"`
-	Genres    []string  `json:"genres,omitempty"`
-	Version   int32     `json:"version"`
+	ID        *int64     `json:"id"`
+	CreatedAt *time.Time `json:"-"`
+	Title     *string    `json:"title"`
+	Year      *int32     `json:"year,omitempty"`
+	Runtime   *Runtime   `json:"runtime,omitempty"`
+	Genres    []string   `json:"genres,omitempty"`
+	Version   *int32     `json:"version"`
 }
 
-func (m Movie) Validate(v *validator.Validator) {
-
-	// the check function will preserve the first error.
-	// In the case of title, if both checks are true, "must be provided" will
-	// be on the map
-	v.Check(m.Title == "", "title", "must be provided")
-	v.Check(len(m.Title) > 500, "title", "must not be more than 500 characters long")
-
-	v.Check(m.Year == 0, "year", "must be provided")
-	v.Check(m.Year < 1988, "year", "must be greater than 1988")
-	v.Check(m.Year > int32(time.Now().Year()), "year", "must not be in the future")
-
-	v.Check(m.Runtime == 0, "runtime", "must be provided")
-	v.Check(m.Runtime < 1, "runtime", "must be a positive integer")
-
-	v.Check(m.Genres == nil, "genres", "must be provided")
-	v.Check(len(m.Genres) == 0, "genres", "must contain at least 1 genre")
-	v.Check(len(m.Genres) > 5, "genres", "must not be more than 5 genres")
-	v.Check(!validator.Unique(m.Genres), "genres", "must not contain duplicate genres")
-	v.Check(validator.In("anime", m.Genres), "genres", "we dont accept animes, thank you")
-
-	v.Check(m.Version != 0, "version", "must be empty")
-	// v.Check(m.Version < 0, "version", "must be a positive integer")
-
-	v.Check(m.ID != 0, "id", "must be empty")
-}
+// -------------------------------------- DB - CRUD
 
 // struct that wraps a sql.DB connection pool
 type MovieModel struct {
 	DB *sql.DB
 }
 
-// mutates the id and created_at camps
 func (m MovieModel) Insert(movie *Movie) error {
 	query := `
-		INSERT INTO movies (title, year, runtime, genres, release)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at
+		INSERT INTO movies (title, year, runtime, genres)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at, release
 	`
 
 	// pq.Array adapts a string[] to pq.StringArray
-	args := []any{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres), movie.Version}
+	args := []any{*movie.Title, *movie.Year, *movie.Runtime, pq.Array(movie.Genres)}
 
 	// executes the query string using the args and assign the return values to
 	// some movie camps
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt)
+	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (m MovieModel) Get(id int64) (*Movie, error) {
@@ -95,52 +70,17 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	return &movie, nil
 }
 
-// func (m MovieModel) GetAll() ([]Movie, error) {
-// 	query := `SELECT "id", "title", "year", "runtime", "genres", "release", "created_at" FROM movies`
-//
-// 	rows, err := m.DB.Query(query)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer rows.Close()
-//
-// 	var movies []Movie
-//
-// 	for rows.Next() {
-// 		var movie Movie
-// 		err := rows.Scan(
-// 			&movie.ID,
-// 			&movie.Title,
-// 			&movie.Year,
-// 			&movie.Runtime,
-// 			pq.Array(&movie.Genres),
-// 			&movie.Version,
-// 			&movie.CreatedAt,
-// 		)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		movies = append(movies, movie)
-// 	}
-//
-// 	return movies, nil
-// }
-
 func (m MovieModel) Update(movie *Movie) error {
-	query := `
-		UPDATE movies
-		SET "release" = "release" + 1, 
-			title = $1,
-			year = $2,
-			runtime = $3,
-			genres = $4
-		WHERE id = $5
-		RETURNING release;
-	`
+	query, args := setQueryArgsWithDefinedValues(*movie)
+	query = fmt.Sprintf(`UPDATE movies SET "release" = "release" + 1, %s WHERE id = $%d RETURNING title, year, runtime, genres, release; `, query, len(args) + 1)
 
-	args := []any{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres), movie.ID}
+	args = append(args, *movie.ID)
 
 	err := m.DB.QueryRow(query, args...).Scan(
+		&movie.Title,
+		&movie.Year,
+		&movie.Runtime,
+		pq.Array(&movie.Genres),
 		&movie.Version,
 	)
 
@@ -175,4 +115,103 @@ func (m MovieModel) Delete(id int64) error {
 	return nil
 }
 
-// type MockMovieModel struct{}
+// ------------------------------------------------------------- sql - helpers
+
+func setQueryArgsWithDefinedValues(input Movie) (string, []any) {
+	fields := make(map[string]any)
+		
+	if input.Title != nil {
+		fields["title"] = *input.Title
+	}
+	if input.Year != nil {
+		fields["year"] = *input.Year
+	}
+	if input.Runtime != nil {
+		fields["runtime"] = *input.Runtime
+	}
+	if input.Genres != nil {
+		fields["genres"] = pq.Array(input.Genres)
+	}
+
+	setClauses := make([]string, 0, movieInputSize + 1)
+	args := make([]any, 0, movieInputSize + 1)
+	pos := 1
+
+	for field, value := range fields {
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", field, pos))
+		args = append(args, value)
+		pos++
+	}
+
+	query := strings.Join(setClauses, ",")
+	return query, args
+}
+
+// ------------------------------------------------------------- validation
+
+func (mi *Movie) Validate(v *validator.Validator, optional  ...string)  {
+	// check for not wanted 'inputs'
+	v.Check(mi.ID != nil, "id", "must not be provided")
+	v.Check(mi.Version != nil, "version", "must not be provided")
+	v.Check(mi.CreatedAt != nil, "created_at", "must not be provided")
+
+	// check for optional inputs
+	if !validator.In("Title", optional) {
+		v.Check(mi.Title == nil, "title", "must be provided")
+	}
+	if !validator.In("Year", optional) {
+		v.Check(mi.Year == nil, "year", "must be provided")
+	}
+	if !validator.In("Runtime", optional) {
+		v.Check(mi.Runtime == nil, "runtime", "must be provided")
+	}
+	if !validator.In("Genres", optional) {
+		v.Check(mi.Genres == nil, "genres", "must be provided")
+	}
+
+	// regular validation
+	mi.validateTitle(v)
+	mi.validateYear(v)
+	mi.validateRuntime(v)
+	mi.validateGenres(v)
+}
+
+// ------------------------------------------------------------- validation - specific
+
+func (mi *Movie) validateTitle(v *validator.Validator) {
+	if mi.Title == nil {
+		return
+	}
+
+    v.Check(*mi.Title == "", "title", "must not be empty")
+    v.Check(len(*mi.Title) > 500, "title", "must not be more than 500 characters long")
+}
+
+func (mi *Movie) validateYear(v *validator.Validator) {
+	if mi.Year == nil {
+		return
+	}
+
+    v.Check(*mi.Year < 1988, "year", "must be greater than 1988")
+    v.Check(*mi.Year > int32(time.Now().Year()), "year", "must not be in the future")
+}
+
+func (mi *Movie) validateRuntime(v *validator.Validator) {
+	if mi.Runtime == nil {
+		return
+	}
+
+    v.Check(*mi.Runtime < 1, "runtime", "must be a positive integer")
+}
+
+func (mi *Movie) validateGenres(v *validator.Validator) {
+	if mi.Genres == nil {
+		return
+	}
+    genres := mi.Genres
+    
+    v.Check(len(genres) == 0, "genres", "must contain at least 1 genre")
+    v.Check(len(genres) > 5, "genres", "must not be more than 5 genres")
+    v.Check(!validator.Unique(genres), "genres", "must not contain duplicate genres")
+    v.Check(validator.In("anime", genres), "genres", "we don't accept animes, thank you")
+}
