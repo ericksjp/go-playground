@@ -9,7 +9,7 @@ import (
 )
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request)  {
-	var input data.Movie
+	var input data.MovieInput
 
 	err := app.readJSON(w, r, &input)
 	if err != nil {
@@ -25,13 +25,16 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.models.Movies.Insert(&input);
+	movie := &data.Movie{}
+	input.ApplyUpdates(movie)
+
+	err = app.models.Movies.Insert(movie);
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": input}, nil)
+	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -64,15 +67,15 @@ func (app * application) showMovieHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request)  {
-	id, err := app.readIDParam(r);
+func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
 	}
 
-	var input data.Movie;
-	err = app.readJSON(w, r, &input);
+	var input data.MovieInput
+	err = app.readJSON(w, r, &input)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -91,19 +94,30 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
-	input.ID = &id
 
-	err = app.models.Movies.Update(&input)
+	movie, err := app.models.Movies.Get(id)
 	if err != nil {
 		if errors.Is(err, data.ErrRecordNotFound) {
 			app.notFoundResponse(w, r)
-			return
+		} else {
+			app.serverErrorResponse(w, r, err)
 		}
-		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{"movie": input}, nil)
+	input.ApplyUpdates(movie)
+
+	err = app.models.Movies.Update(movie)
+	if err != nil {
+		if errors.Is(err, data.ErrEditConflict) {
+			app.editConflictResponse(w, r)
+		} else {
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

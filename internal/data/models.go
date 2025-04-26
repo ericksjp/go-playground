@@ -5,7 +5,11 @@ import (
 	"errors"
 )
 
-var ErrRecordNotFound = errors.New("record not found")
+var (
+	ErrRecordNotFound = errors.New("record not found")
+	ErrEditConflict   = errors.New("edit conflict")
+
+)
 
 // struct that will hold models of our application
 type Models struct {
