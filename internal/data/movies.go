@@ -31,7 +31,7 @@ func (m MovieModel) List(title string, genres []string) ([]*Movie, error) {
 	query := `
 		SELECT id, title, year, runtime, genres, version, created_at
 		FROM movies
-		WHERE (LOWER(title) = LOWER($1) OR $1 = '')
+		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		AND (genres @> $2 OR $2 = '{}')
 		ORDER BY id`
 
