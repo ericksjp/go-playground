@@ -17,6 +17,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/ericksjp703/greenlight/internal/data"
+	"github.com/ericksjp703/greenlight/internal/jsonlog"
 )
 
 const version = "1.0.0"
@@ -35,7 +36,7 @@ type config struct {
 
 type application struct {
 	config config
-	logger *log.Logger
+	logger *jsonlog.Logger
 	models data.Models
 }
 
@@ -83,17 +84,19 @@ func main() {
 
 	flag.Parse()
 
-	// server logger
-	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
+	// write to stdout and Logs >= LevelInfo
+	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
 	// open a connection pool to the database, exits if error
 	db, err := openDB(&cfg)
 	if err != nil {
-		logger.Fatal(err)
+		// using the logger to print the error message and exit the program
+		logger.PrintFatal(err, nil)
 	}
 	// ensure the connection pool is closed before the main function exits
 	defer db.Close()
-	logger.Println("database connection established")
+
+	logger.PrintInfo("database connection established", nil)
 
 	app := &application{
 		config: cfg,
@@ -105,14 +108,24 @@ func main() {
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.port),
 		Handler:      app.routes(),
+		// the http server will use our jsonlogger to log the messages.
+		// he can be passed as argument here because implements the io.Writer
+		// interface
+		ErrorLog:     log.New(logger, "", 0),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
-	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
+	// passing a map containing additinal properties
+	logger.PrintInfo("starting server", map[string]string{
+		"env": cfg.env,
+		"addr": srv.Addr,
+	})
+
 	err = srv.ListenAndServe()
-	logger.Fatal(err)
+	// using the fatal print to log the error and quit the process
+	logger.PrintFatal(err, nil)
 }
 
 // creates a connection pool and verifies if everything is ok

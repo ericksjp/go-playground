@@ -6,25 +6,29 @@ import (
 )
 
 // helper to use the app logger to log errors
-func (app *application) logError(err error) {
-	app.logger.Println(err)
+func (app *application) logError(r *http.Request, err error) {
+	// using the logger to include  current request method and url in the log entry
+	app.logger.PrintError(err, map[string]string{
+		"request_method": r.Method,
+		"request_url": r.URL.String(),
+	})
 }
 
 // generic error response
 // this basically will just envelope the error message with "error" and send
 // a status 500 to the client if the error cannot be written to the response
-func (app *application) errorResponse(w http.ResponseWriter, _ *http.Request, status int, message any) {
+func (app *application) errorResponse(w http.ResponseWriter, r *http.Request, status int, message any) {
 	err := app.writeJSON(w, status, envelope{"error": message}, nil)
 
 	if err != nil {
-		app.logError(err)
+		app.logError(r, err)
 		w.WriteHeader(500)
 	}
 }
 
 // specific for 500 internal server error
 func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
-	app.logError(err)
+	app.logError(r, err)
 	message := "the server encountered a problem and could not process your request"
 	app.errorResponse(w, r, http.StatusInternalServerError, message)
 }
