@@ -29,7 +29,7 @@ type MovieModel struct {
 
 func (m MovieModel) List(title string, genres []string) ([]*Movie, error) {
 	query := `
-		SELECT id, title, year, runtime, genres, release, created_at
+		SELECT id, title, year, runtime, genres, version, created_at
 		FROM movies
 		WHERE (LOWER(title) = LOWER($1) OR $1 = '')
 		AND (genres @> $2 OR $2 = '{}')
@@ -76,7 +76,7 @@ func (m MovieModel) Insert(movie *Movie) error {
 	query := `
 		INSERT INTO movies (title, year, runtime, genres)
 		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at, release
+		RETURNING id, created_at, version
 	`
 
 	// pq.Array adapts a string[] to pq.StringArray
@@ -93,7 +93,7 @@ func (m MovieModel) Insert(movie *Movie) error {
 func (m MovieModel) Get(id int64) (*Movie, error) {
 	var movie Movie
 	query := `
-		SELECT pg_sleep(10), id, title, year, runtime, genres, release, created_at FROM movies
+		SELECT pg_sleep(10), id, title, year, runtime, genres, version, created_at FROM movies
 		WHERE id = $1
 	`
 
@@ -124,9 +124,9 @@ func (m MovieModel) Update(movie *Movie) error {
 	// optimistic concurrency control using the version column
 	query := `
 		UPDATE movies
-		SET title = $1, year = $2, runtime = $3, genres = $4, release = release + 1
-		WHERE id = $5 AND release = $6
-		RETURNING release
+		SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
+		WHERE id = $5 AND version = $6
+		RETURNING version
 	`
 
 	args := []any{
