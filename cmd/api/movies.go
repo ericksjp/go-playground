@@ -12,14 +12,26 @@ func (app *application) listMoviesHanlder(w http.ResponseWriter, r *http.Request
 	var input struct {
 		Title string
 		Genres []string
+		data.Filters
 	}
+
+	v := validator.New()
 
 	qs := r.URL.Query()
 
 	input.Title = app.readString(qs, "title", "")
 	input.Genres = app.readCSV(qs, "genres", []string{})
 
-	movies, err :=  app.models.Movies.List(input.Title, input.Genres)
+	input.Sort = app.readString(qs, "sort", "id")
+	input.SorteableList = []string{"id", "title", "runtime", "year", "-id", "-title", "-runtime", "-year"}
+
+	data.ValidateFilters(v, input.Filters)
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	movies, err :=  app.models.Movies.List(input.Title, input.Genres, input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

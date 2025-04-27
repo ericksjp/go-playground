@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ericksjp703/greenlight/internal/validator"
@@ -27,13 +28,13 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-func (m MovieModel) List(title string, genres []string) ([]*Movie, error) {
-	query := `
+func (m MovieModel) List(title string, genres []string, f Filters) ([]*Movie, error) {
+	query := fmt.Sprintf(`
 		SELECT id, title, year, runtime, genres, version, created_at
 		FROM movies
 		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		AND (genres @> $2 OR $2 = '{}')
-		ORDER BY id`
+		ORDER BY %s %s;`, f.sortColumn(), f.sortOrder())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
