@@ -28,29 +28,40 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-func (m MovieModel) List(title string, genres []string, f Filters) ([]*Movie, error) {
+func (m MovieModel) List(title string, genres []string, f Filters) ([]*Movie, Metadada,  error) {
 	query := fmt.Sprintf(`
-		SELECT id, title, year, runtime, genres, version, created_at
+		SELECT COUNT(*) OVER(), id, title, year, runtime, genres, version, created_at
 		FROM movies
 		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		AND (genres @> $2 OR $2 = '{}')
-		ORDER BY %s %s;`, f.sortColumn(), f.sortOrder())
+		ORDER BY %s %s
+		LIMIT $3 OFFSET $4;`, f.sortColumn(), f.sortOrder())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(genres))
+	args := []any{
+		title,
+		pq.Array(genres),
+		f.limit(),
+		f.offset(),
+	}
+
+	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, Metadada{}, err
 	}
 	defer rows.Close()
 
-	movies := []*Movie{}
+
+	movies := make([]*Movie, 0, f.limit());
+	var totalRecords int
 
 	for rows.Next() {
 		var movie Movie
 
 		err := rows.Scan(
+			&totalRecords,
 			&movie.ID,
 			&movie.Title,
 			&movie.Year,
@@ -60,17 +71,19 @@ func (m MovieModel) List(title string, genres []string, f Filters) ([]*Movie, er
 			&movie.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Metadada{}, err
 		}
 
 		movies = append(movies, &movie)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadada{}, err
 	}
 
-	return movies, nil
+	metadada := CalculateMetadada(totalRecords, f.Page, f.PageSize)
+
+	return movies, metadada, nil
 }
 
 func (m MovieModel) Insert(movie *Movie) error {

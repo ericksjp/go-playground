@@ -22,6 +22,9 @@ func (app *application) listMoviesHanlder(w http.ResponseWriter, r *http.Request
 	input.Title = app.readString(qs, "title", "")
 	input.Genres = app.readCSV(qs, "genres", []string{})
 
+	input.Page = app.readInt(qs, "page", 1, v)
+	input.PageSize = app.readInt(qs, "page_size", 20, v)
+
 	input.Sort = app.readString(qs, "sort", "id")
 	input.SorteableList = []string{"id", "title", "runtime", "year", "-id", "-title", "-runtime", "-year"}
 
@@ -31,13 +34,13 @@ func (app *application) listMoviesHanlder(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	movies, err :=  app.models.Movies.List(input.Title, input.Genres, input.Filters)
+	movies, metadada, err :=  app.models.Movies.List(input.Title, input.Genres, input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{"movies": movies}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"movies": movies, "metadada": metadada}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
