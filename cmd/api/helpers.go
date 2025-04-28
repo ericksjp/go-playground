@@ -155,3 +155,16 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 
 	return i
 }
+
+// executes a function in a separate goroutine and recovers from panic
+func (app *application) background(fn func()) {
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				app.logger.PrintFatal(fmt.Errorf("%s", err), nil);
+			}
+		}()
+
+		fn()
+	}()
+}
