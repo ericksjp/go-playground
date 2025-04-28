@@ -20,6 +20,12 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteMovieHandler)
 	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.updateMovieHandler)
 
+	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/users/:id", app.getUserHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/users/:id", app.updateUserHandler)
+	router.HandlerFunc(http.MethodPatch, "/v1/users/:id", app.updateUserHandler)
+	router.HandlerFunc(http.MethodDelete, "/v1/users/:id", app.deleteUserHandler)
+
 	if (!app.config.limiter.enabled) {
 		return app.recoverPanic(router)
 	}

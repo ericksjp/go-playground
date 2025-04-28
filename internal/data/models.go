@@ -8,7 +8,6 @@ import (
 var (
 	ErrRecordNotFound = errors.New("record not found")
 	ErrEditConflict   = errors.New("edit conflict")
-
 )
 
 // struct that will hold models of our application
@@ -20,14 +19,19 @@ type Models struct {
 		Delete(id int64) error;
 		List(title string, genres []string, filter Filters) ([]*Movie, Metadada, error)
 	}
+	Users interface {
+		Insert(user *User) error;
+		GetUserByEmail(email string) (*User, error)
+		Get(id int64) (*User, error)
+		Update(user *User) (error)
+		Delete(id int64) error;
+	}
 }
 
 // return a Models struct containing the initialized models
 func NewModels(db *sql.DB) Models {
 	return Models{
-		Movies: MovieModel{
-			DB: db,
-		},
-		// Movies: MovieMockModel{},
+		Movies: MovieModel{ DB: db },
+		Users: UserModel{ DB: db },
 	}
 }
