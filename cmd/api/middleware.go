@@ -3,7 +3,27 @@ package main
 import (
 	"fmt"
 	"net/http"
+
+	"golang.org/x/time/rate"
 )
+
+func (app *application) rateLimit(next http.Handler) http.Handler {
+	// Rate limiter with a bucket capacity of 4 tokens and a refill rate of
+	// 2 tokens per second.
+	limiter := rate.NewLimiter(2, 4)
+
+	// use closure to acess the limiter
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// send error if theres no tokens in the bucket
+		if !limiter.Allow() {
+			app.rateLimitExceededResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+
+}
 
 func (app *application) recoverPanic(next http.Handler) http.Handler  {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
