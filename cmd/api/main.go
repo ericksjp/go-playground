@@ -17,6 +17,7 @@ import (
 
 	"github.com/ericksjp703/greenlight/internal/data"
 	"github.com/ericksjp703/greenlight/internal/jsonlog"
+	"github.com/ericksjp703/greenlight/internal/mailer"
 )
 
 const version = "1.0.0"
@@ -25,16 +26,23 @@ type config struct {
 	port int
 	env  string
 	db   struct {
-		dns             string
-		maxOpenConns    int
-		maxIdleConns    int
-		maxIdleTime     string
-		maxLifetime 	string
+		dns          string
+		maxOpenConns int
+		maxIdleConns int
+		maxIdleTime  string
+		maxLifetime  string
 	}
 	limiter struct {
-		rps float64
-		burst int
+		rps     float64
+		burst   int
 		enabled bool
+	}
+	smtp struct {
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
 	}
 }
 
@@ -42,15 +50,16 @@ type application struct {
 	config config
 	logger *jsonlog.Logger
 	models data.Models
+	mailer mailer.Mailer
 }
 
 // healthCheckHandler responds to /v1/healthcheck with a JSON object
-func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Request)  {
+func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	data := envelope{
 		"status": "available",
 		"system_info": map[string]string{
 			"version": version,
-			"env": app.config.env,
+			"env":     app.config.env,
 		},
 	}
 	app.writeJSON(w, 200, data, nil)
@@ -106,6 +115,13 @@ func main() {
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", envOrDef("LIMITER_BURST", 4), "Rate limiter burst capacity")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", envOrDef("LIMITER_ENABLED", true), "Enable or disable the rate limiter")
 
+	// SMTP configuration
+	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("SMTP_HOST"), "SMTP host")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", envOrDef("SMTP_PORT", 587), "SMTP port")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("SMTP_USERNAME"), "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("SMTP_PASSWORD"), "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("SMTP_SENDER"), "SMTP sender")
+
 	flag.Parse()
 
 	// write to stdout and Logs >= LevelInfo
@@ -126,6 +142,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 
 	err = app.serve()
@@ -139,31 +156,31 @@ func main() {
 // creates a connection pool and verifies if everything is ok
 func openDB(cfg *config) (*sql.DB, error) {
 	// creates a empty connection pool using the dns string from config
-	db, err := sql.Open("postgres", cfg.db.dns + "?sslmode=disable")
+	db, err := sql.Open("postgres", cfg.db.dns+"?sslmode=disable")
 	if err != nil {
 		return nil, err
 	}
 
 	// set the maximum number of open connections (both idle and in-use) allowed in the connection pool
-	db.SetMaxOpenConns(cfg.db.maxOpenConns);
+	db.SetMaxOpenConns(cfg.db.maxOpenConns)
 	// set the maximum number of idle connections allowed in the connection pool
-	db.SetMaxIdleConns(cfg.db.maxIdleConns);
+	db.SetMaxIdleConns(cfg.db.maxIdleConns)
 	// set the maximum duration a connection can remain idle in the pool before being closed
 	duration, err := time.ParseDuration(cfg.db.maxIdleTime)
 	if err != nil {
 		return nil, err
 	}
-	db.SetConnMaxIdleTime(duration);
+	db.SetConnMaxIdleTime(duration)
 	// set the maximum lifetime of a connection in the pool, after which it will be closed and removed
 	duration, err = time.ParseDuration(cfg.db.maxLifetime)
 	if err != nil {
 		return nil, err
 	}
-	db.SetConnMaxLifetime(duration);
+	db.SetConnMaxLifetime(duration)
 
 	// Creates a context with a 5-second timeout, ensuring PingContext cancels
 	// if the connection is not established within that time
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	// establish a connection to the database using the context
@@ -171,6 +188,6 @@ func openDB(cfg *config) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return db, nil
 }
