@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -129,28 +128,12 @@ func main() {
 		models: data.NewModels(db),
 	}
 
-	// server instance
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      app.routes(),
-		// the http server will use our jsonlogger to log the messages.
-		// he can be passed as argument here because implements the io.Writer
-		// interface
-		ErrorLog:     log.New(logger, "", 0),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	err = app.serve()
+	if err != nil {
+		logger.PrintFatal(err, nil)
 	}
 
-	// passing a map containing additinal properties
-	logger.PrintInfo("starting server", map[string]string{
-		"env": cfg.env,
-		"addr": srv.Addr,
-	})
-
-	err = srv.ListenAndServe()
-	// using the fatal print to log the error and quit the process
-	logger.PrintFatal(err, nil)
+	os.Exit(0)
 }
 
 // creates a connection pool and verifies if everything is ok
