@@ -158,7 +158,13 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 
 // executes a function in a separate goroutine and recovers from panic
 func (app *application) background(fn func()) {
+	// add a new goroutine to the wait group
+	app.wg.Add(1);
+
 	go func() {
+		// decrement the wait group before the goroutine retuns
+		defer app.wg.Done()
+
 		defer func() {
 			if err := recover(); err != nil {
 				app.logger.PrintFatal(fmt.Errorf("%s", err), nil);

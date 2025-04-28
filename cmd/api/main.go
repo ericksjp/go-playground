@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	// for some reason the pq driver needs to be registered with the sql
@@ -51,6 +52,7 @@ type application struct {
 	logger *jsonlog.Logger
 	models data.Models
 	mailer mailer.Mailer
+	wg sync.WaitGroup
 }
 
 // healthCheckHandler responds to /v1/healthcheck with a JSON object

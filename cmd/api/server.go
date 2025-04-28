@@ -46,9 +46,19 @@ func (app *application) serve() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		// throw nil if the shutdown occurs gracefully, otherwise will throw
-		// an error to the channel
-		shutdownError <- srv.Shutdown(ctx)
+		// writing to the channel only if the server is not stopped gracefully
+		err := srv.Shutdown(ctx)
+		if err != nil {
+			shutdownError <- err
+		}
+
+		app.logger.PrintInfo("completing background tasks", map[string]string{
+			"addr": srv.Addr,
+		})
+
+		// block until the counter is 0
+		app.wg.Wait()
+		shutdownError <- nil
 	}()
 
 	// passing a map containing additinal properties
