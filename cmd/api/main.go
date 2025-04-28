@@ -32,7 +32,6 @@ type config struct {
 		maxIdleTime     string
 		maxLifetime 	string
 	}
-
 	limiter struct {
 		rps float64
 		burst int
@@ -58,46 +57,33 @@ func (app *application) healthCheckHandler(w http.ResponseWriter, r *http.Reques
 	app.writeJSON(w, 200, data, nil)
 }
 
-func getenvAsInt(key string) int {
+func envOrDef[T comparable](key string, defaultValue T) T {
 	value, ok := os.LookupEnv(key)
 	if !ok {
-		log.Fatalf("the environment variable '%s' should be specified", key)
+		return defaultValue
 	}
 
-	intVal, err := strconv.Atoi(value);
+	var err error
+	var result any
+
+	switch any(defaultValue).(type) {
+	case string:
+		result = value
+	case int:
+		result, err = strconv.Atoi(value)
+	case bool:
+		result, err = strconv.ParseBool(value)
+	case float64:
+		result, err = strconv.ParseFloat(value, 64)
+	default:
+		log.Fatalf("unsupported type for environment variable '%s'", key)
+	}
+
 	if err != nil {
-		log.Fatalf("the environment variable '%s' should be an integer", key)
+		log.Fatalf("invalid type for environment variable '%s'", key)
 	}
 
-	return intVal
-}
-
-func getenvAsBool(key string) bool {
-	value, ok := os.LookupEnv(key)
-	if !ok {
-		log.Fatalf("the environment variable '%s' should be specified", key)
-	}
-
-	boolVal, err := strconv.ParseBool(value);
-	if err != nil {
-		log.Fatalf("the environment variable '%s' should be a boolean", key)
-	}
-
-	return boolVal
-}
-
-func getEnvAsFloat(key string) float64 {
-	value, ok := os.LookupEnv(key)
-	if !ok {
-		log.Fatalf("the environment variable '%s' should be specified", key)
-	}
-
-	floatVal, err := strconv.ParseFloat(value, 64);
-	if err != nil {
-		log.Fatalf("the environment variable '%s' should be a float", key)
-	}
-
-	return floatVal
+	return result.(T)
 }
 
 func main() {
@@ -106,20 +92,20 @@ func main() {
 	var cfg config
 
 	// Load command-line flags with environment variable defaults
-	flag.IntVar(&cfg.port, "port", getenvAsInt("PORT"), "api port")
-	flag.StringVar(&cfg.env, "env", os.Getenv("ENV"), "api env (development|staging|production)")
+	flag.IntVar(&cfg.port, "port", envOrDef("PORT", 3000), "api port")
+	flag.StringVar(&cfg.env, "env", envOrDef("ENV", "development"), "api env (development|staging|production)")
 
 	// Database configuration
 	flag.StringVar(&cfg.db.dns, "db-dns", os.Getenv("DB_DNS"), "postgresql dns")
-	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", getenvAsInt("DB_MAX_OPEN_CONNS"), "PostgreSQL max open connections")
-	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", getenvAsInt("DB_MAX_IDLE_CONNS"), "PostgreSQL max idle connections")
-	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", os.Getenv("DB_MAX_IDLE_TIME"), "PostgreSQL max connection idle time")
-	flag.StringVar(&cfg.db.maxLifetime, "db-max-lifetime", os.Getenv("DB_MAX_LIFETIME"), "PostgreSQL max connection lifetime")
+	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", envOrDef("DB_MAX_OPEN_CONNS", 25), "PostgreSQL max open connections")
+	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", envOrDef("DB_MAX_IDLE_CONNS", 25), "PostgreSQL max idle connections")
+	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", envOrDef("DB_MAX_IDLE_TIME", "15m"), "PostgreSQL max connection idle time")
+	flag.StringVar(&cfg.db.maxLifetime, "db-max-lifetime", envOrDef("DB_MAX_LIFETIME", "0m"), "PostgreSQL max connection lifetime")
 
 	// Rate limiter configuration
-	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", getEnvAsFloat("LIMITER_RPS"), "Rate limiter requests per second")
-	flag.IntVar(&cfg.limiter.burst, "limiter-burst", getenvAsInt("LIMITER_BURST"), "Rate limiter burst capacity")
-	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", getenvAsBool("LIMITER_ENABLED"), "Enable or disable the rate limiter")
+	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", envOrDef("LIMITER_RPS", float64(2)), "Rate limiter requests per second")
+	flag.IntVar(&cfg.limiter.burst, "limiter-burst", envOrDef("LIMITER_BURST", 4), "Rate limiter burst capacity")
+	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", envOrDef("LIMITER_ENABLED", true), "Enable or disable the rate limiter")
 
 	flag.Parse()
 
