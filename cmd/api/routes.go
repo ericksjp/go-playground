@@ -20,6 +20,10 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteMovieHandler)
 	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.updateMovieHandler)
 
+	if (!app.config.limiter.enabled) {
+		return app.recoverPanic(router)
+	}
+
 	// wrap the router with the recover panic/rateLimit middlewares
 	return app.recoverPanic(app.rateLimit(router))
 }

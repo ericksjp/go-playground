@@ -32,6 +32,12 @@ type config struct {
 		maxIdleTime     string
 		maxLifetime 	string
 	}
+
+	limiter struct {
+		rps float64
+		burst int
+		enabled bool
+	}
 }
 
 type application struct {
@@ -66,6 +72,34 @@ func getenvAsInt(key string) int {
 	return intVal
 }
 
+func getenvAsBool(key string) bool {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		log.Fatalf("the environment variable '%s' should be specified", key)
+	}
+
+	boolVal, err := strconv.ParseBool(value);
+	if err != nil {
+		log.Fatalf("the environment variable '%s' should be a boolean", key)
+	}
+
+	return boolVal
+}
+
+func getEnvAsFloat(key string) float64 {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		log.Fatalf("the environment variable '%s' should be specified", key)
+	}
+
+	floatVal, err := strconv.ParseFloat(value, 64);
+	if err != nil {
+		log.Fatalf("the environment variable '%s' should be a float", key)
+	}
+
+	return floatVal
+}
+
 func main() {
 
 	// gettin cmd args
@@ -81,6 +115,11 @@ func main() {
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", getenvAsInt("DB_MAX_IDLE_CONNS"), "PostgreSQL max idle connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", os.Getenv("DB_MAX_IDLE_TIME"), "PostgreSQL max connection idle time")
 	flag.StringVar(&cfg.db.maxLifetime, "db-max-lifetime", os.Getenv("DB_MAX_LIFETIME"), "PostgreSQL max connection lifetime")
+
+	// Rate limiter configuration
+	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", getEnvAsFloat("LIMITER_RPS"), "Rate limiter requests per second")
+	flag.IntVar(&cfg.limiter.burst, "limiter-burst", getenvAsInt("LIMITER_BURST"), "Rate limiter burst capacity")
+	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", getenvAsBool("LIMITER_ENABLED"), "Enable or disable the rate limiter")
 
 	flag.Parse()
 
