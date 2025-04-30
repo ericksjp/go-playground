@@ -146,7 +146,7 @@ func (m UserModel) Get(id int64) (*User, error) {
 	return m.getUser(query, id)
 }
 
-func (m UserModel) GetUserByEmail(email string) (*User, error) {
+func (m UserModel) GetByEmail(email string) (*User, error) {
 	query := `
 		SELECT id, name, email, password_hash, activated, version
 		FROM users

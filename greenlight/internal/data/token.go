@@ -11,14 +11,15 @@ import (
 
 const (
 	ScopeActivation = "activation"
+	ScopeAuthentication = "authentication"
 )
 
 type Token struct {
-	UserID    int64
-	Plaintext string
-	Hash      []byte
-	Expiry    time.Time
-	Scope     string
+	Plaintext string    `json:"token"`
+	UserID    int64     `json:"-"`
+	Hash      []byte    `json:"-"`
+	Expiry    time.Time `json:"expiry"`
+	Scope     string    `json:"-"`
 }
 
 // generate a new token for a user with a specific duration and scope 

@@ -28,6 +28,8 @@ func (app *application) routes() http.Handler {
 
 	router.HandlerFunc(http.MethodPut, "/v1/users/:id/activated", app.activateUserHandler)
 
+	router.HandlerFunc(http.MethodPost, "/v1/tokens/auth", app.createAuthTokenHandler)
+
 	if (!app.config.limiter.enabled) {
 		return app.recoverPanic(router)
 	}
