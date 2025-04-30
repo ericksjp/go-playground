@@ -71,10 +71,23 @@ func (app *application) invalidCredentialsResponse(w http.ResponseWriter, r *htt
 	app.errorResponse(w, r, http.StatusTooManyRequests, message)
 }
 
-func (app *application) invalidAuthenticationTokenResponse (w http.ResponseWriter, r *http.Request) {
+// specific for 401 status unauthorized (invalid token)
+func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter, r *http.Request) {
 	// inform the client that we want this token
 	w.Header().Set("WWW-Authenticate", "Bearer")
 
 	message := "invalid or missing authentication token"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
+
+// specific for 401 status unauthorized (user not authenticated)
+func (app *application) authenticationRequired(w http.ResponseWriter, r *http.Request)  {
+	message := "you must be authenticate to acess this resource"
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
+
+// specific for 405 status forbidden
+func (app *application) inactiveAccountResponse(w http.ResponseWriter, r *http.Request)  {
+	message := "your user account must be activated to acess this resource"
+	app.errorResponse(w, r, http.StatusForbidden, message)
 }

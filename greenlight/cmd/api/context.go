@@ -23,3 +23,12 @@ func (app *application) requestContextWithUser(r *http.Request, user *data.User)
 	ctx := context.WithValue(r.Context(), userKey, user)
 	return r.WithContext(ctx)
 }
+
+// gets a user from a request context
+func (app *application) userFromRequestContext(r *http.Request) *data.User {
+	val, ok := r.Context().Value(userKey).(*data.User)
+	if !ok {
+		panic("missing user value in request context")
+	}
+	return val
+}
