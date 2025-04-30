@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/ericksjp703/greenlight/internal/data"
 	"github.com/ericksjp703/greenlight/internal/validator"
@@ -56,7 +57,6 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 	user.Activated = false
 
-
 	err = app.models.Users.Insert(&user)
 	if err != nil {
 		switch {
@@ -69,9 +69,22 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// 3 day expiration token
+	token, err := app.models.Token.New(user.ID, time.Hour * 24 * 3, data.ScopeActivation)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// launch the logic to send the email in a goroutine
 	app.background(func() {
-		err := app.mailer.Send(user.Email, "user_welcome.tmpl", user)
+
+		data := map[string]any {
+			"userID": user.ID,
+			"activationToken": token.Plaintext,
+		}
+
+		err := app.mailer.Send(user.Email, "user_welcome.tmpl", data)
 		if err != nil {
 			app.logger.PrintError(err, nil)
 		}
@@ -171,3 +184,68 @@ func (app *application) deleteUserHandler(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	var input struct {
+		Token string `json:"token"`
+	}
+
+	err = app.readJSON(w, r, &input);
+	if err != nil {
+		app.badRequestResponse(w, r, err);
+		return
+	}
+
+	v := validator.New()
+	data.ValidateTokenPlaintext(v, input.Token)
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+	}
+
+	// get a user for the given token scope and plaintext
+	user, err := app.models.Users.GetForToken(data.ScopeActivation, input.Token)
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			app.notFoundResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	if (user.ID != id) {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	// update the user activation status
+	user.Activated = true
+
+	// save the update user on the db
+	err = app.models.Users.Update(user)
+	if err != nil {
+		if errors.Is(err, data.ErrEditConflict) {
+			app.editConflictResponse(w, r)
+			return
+		}
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// delete all activation tokens for the user
+	err = app.models.Token.DeleteAllForUser(user.ID, data.ScopeActivation)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"user": user}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}

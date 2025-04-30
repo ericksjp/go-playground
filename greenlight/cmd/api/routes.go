@@ -26,6 +26,8 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPatch, "/v1/users/:id", app.updateUserHandler)
 	router.HandlerFunc(http.MethodDelete, "/v1/users/:id", app.deleteUserHandler)
 
+	router.HandlerFunc(http.MethodPut, "/v1/users/:id/activated", app.activateUserHandler)
+
 	if (!app.config.limiter.enabled) {
 		return app.recoverPanic(router)
 	}

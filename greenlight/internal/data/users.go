@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"time"
@@ -69,6 +70,11 @@ func ValidatePassword(v *validator.Validator, password string) {
 	v.Check(password == "", "password", "must be provided")
 	v.Check(len(password) < 8, "password", "must be at least 8 bytes long")
 	v.Check(len(password) > 72, "password", "must be at max 72 bytes long")
+}
+
+func ValidateTokenPlaintext(v *validator.Validator, plaintextToken string) {
+	v.Check(plaintextToken == "", "token", "must not be empty")
+	v.Check(len(plaintextToken) != 26, "token", "invalid or expired activation token")
 }
 
 type UserModel struct {
@@ -209,6 +215,49 @@ func (u UserModel) Delete(id int64) error {
 	}
 
 	return nil
+}
+
+func (u UserModel) GetForToken(tokenScope string, tokenPlainText string) (*User, error) {
+	// calculate the sha-256 hash for the plaintext token
+	tokenHash := sha256.Sum256([]byte(tokenPlainText))
+
+	query := `
+		SELECT u.id, u.name, u.email, u.password_hash, u.activated, u.version
+		FROM users u
+		INNER JOIN tokens t
+		ON u.id = t.user_id
+		WHERE t.hash = $1
+		AND t.scope = $2
+		AND t.expiry > $3
+	`
+
+	// transform the tokenHash arr into a slice
+	// pass the current time to check againt the expiry time of the token
+	args := []any{tokenHash[:], tokenScope, time.Now()}
+
+	var user User
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := u.DB.QueryRowContext(ctx, query, args...).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Password.hash,
+		&user.Activated,
+		&user.Version,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
 }
 
 // ------------------------------------------------------------- User Input

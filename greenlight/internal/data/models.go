@@ -3,6 +3,7 @@ package data
 import (
 	"database/sql"
 	"errors"
+	"time"
 )
 
 var (
@@ -25,13 +26,20 @@ type Models struct {
 		Get(id int64) (*User, error)
 		Update(user *User) (error)
 		Delete(id int64) error;
+		GetForToken(tokenScope string, plainText string) (*User, error)
+	}
+	Token interface {
+		Insert(token *Token) error
+		DeleteAllForUser(id int64, scope string) error
+		New(userID int64, duration time.Duration, scope string) (*Token, error)
 	}
 }
 
 // return a Models struct containing the initialized models
 func NewModels(db *sql.DB) Models {
 	return Models{
-		Movies: MovieModel{ DB: db },
-		Users: UserModel{ DB: db },
+		Movies: MovieModel{DB: db},
+		Users:  UserModel{DB: db},
+		Token:  TokenModel{DB: db},
 	}
 }
