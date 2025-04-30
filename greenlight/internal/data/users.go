@@ -51,6 +51,7 @@ func (p *password) Matches(plaintext string) (bool, error) {
 	return true, nil
 }
 
+
 type User struct {
 	ID        int64     `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -59,6 +60,13 @@ type User struct {
 	Password  password  `json:"-"`
 	Activated bool      `json:"activated"`
 	Version   int       `json:"-"`
+}
+
+// a singleton instance representing an unauthenticated (anonymous) user.
+var AnonymousUser = &User{}
+
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
 }
 
 func ValidateEmail(v *validator.Validator, email string) {

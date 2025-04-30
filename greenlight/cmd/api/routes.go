@@ -31,9 +31,9 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/auth", app.createAuthTokenHandler)
 
 	if (!app.config.limiter.enabled) {
-		return app.recoverPanic(router)
+		return app.recoverPanic(app.authenticate(router))
 	}
 
-	// wrap the router with the recover panic/rateLimit middlewares
-	return app.recoverPanic(app.rateLimit(router))
+	// wrap the router with the recover panic/rateLimit/authenticate middlewares
+	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
 }
