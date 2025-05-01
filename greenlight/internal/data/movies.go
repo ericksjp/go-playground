@@ -107,7 +107,7 @@ func (m MovieModel) Insert(movie *Movie) error {
 func (m MovieModel) Get(id int64) (*Movie, error) {
 	var movie Movie
 	query := `
-		SELECT pg_sleep(10), id, title, year, runtime, genres, version, created_at FROM movies
+		SELECT id, title, year, runtime, genres, version, created_at FROM movies
 		WHERE id = $1
 	`
 
