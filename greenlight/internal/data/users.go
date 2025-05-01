@@ -268,6 +268,48 @@ func (u UserModel) GetForToken(tokenScope string, tokenPlainText string) (*User,
 	return &user, nil
 }
 
+func (u UserModel) GetAllForPermission(permission string) ([]*User, error) {
+	query := `
+		SELECT u.id, u.name, u.email, u.password_hash, u.activated, u.version
+		FROM users u
+		INNER JOIN users_permissions up ON u.id = up.user_id
+		INNER JOIN permissions p ON up.permission_id = p.id
+		WHERE p.code = $1`
+
+	var users []*User
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	rows, err := u.DB.QueryContext(ctx, query, permission)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return users, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user User
+		err := rows.Scan(
+			&user.ID,
+			&user.Name,
+			&user.Email,
+			&user.Password.hash,
+			&user.Activated,
+			&user.Version,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, &user)
+	}
+
+	return users, nil
+}
+
 // ------------------------------------------------------------- User Input
 
 type UserInput struct {

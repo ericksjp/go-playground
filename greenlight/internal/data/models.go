@@ -27,11 +27,15 @@ type Models struct {
 		Update(user *User) (error)
 		Delete(id int64) error;
 		GetForToken(tokenScope string, plainText string) (*User, error)
+		GetAllForPermission(permission string) ([]*User, error)
 	}
 	Token interface {
 		Insert(token *Token) error
 		DeleteAllForUser(id int64, scope string) error
 		New(userID int64, duration time.Duration, scope string) (*Token, error)
+	}
+	Permissions interface {
+		GetAllForUser(userID int64) (Permissions, error)
 	}
 }
 
@@ -41,5 +45,6 @@ func NewModels(db *sql.DB) Models {
 		Movies: MovieModel{DB: db},
 		Users:  UserModel{DB: db},
 		Token:  TokenModel{DB: db},
+		Permissions: PermissionModel{DB: db},
 	}
 }
