@@ -69,6 +69,13 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// add movies read permissions on user registration
+	err = app.models.Permissions.AddForUser(user.ID, "movies:read")
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// 3 day expiration token
 	token, err := app.models.Token.New(user.ID, time.Hour * 24 * 3, data.ScopeActivation)
 	if err != nil {
@@ -239,6 +246,13 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 
 	// delete all activation tokens for the user
 	err = app.models.Token.DeleteAllForUser(user.ID, data.ScopeActivation)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// add movies write permissions on user activation
+	err = app.models.Permissions.AddForUser(user.ID, "movies:write")
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

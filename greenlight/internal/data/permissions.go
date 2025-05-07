@@ -6,6 +6,8 @@ import (
 	"errors"
 	"slices"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 type Permissions []string
@@ -51,4 +53,22 @@ func (p PermissionModel) GetAllForUser(userID int64) (Permissions, error) {
 	}
 
 	return permissions, nil
+}
+
+func (p PermissionModel) AddForUser(userId int64, permissions ...string) error {
+	query := `
+		INSERT into users_permissions
+		SELECT $1, permissions.id FROM permissions WHERE permissions.code = ANY($2)
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	args := []any{
+		userId,
+		pq.Array(permissions),
+	}
+
+	_, err := p.DB.ExecContext(ctx, query, args...)
+	return err
 }
