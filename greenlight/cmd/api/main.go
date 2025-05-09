@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,9 @@ type config struct {
 		password string
 		sender   string
 	}
+	cors struct {
+		trustedOrigins []string
+	}
 }
 
 type application struct {
@@ -52,7 +56,7 @@ type application struct {
 	logger *jsonlog.Logger
 	models data.Models
 	mailer mailer.Mailer
-	wg sync.WaitGroup
+	wg     sync.WaitGroup
 }
 
 // healthCheckHandler responds to /v1/healthcheck with a JSON object
@@ -124,7 +128,18 @@ func main() {
 	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("SMTP_PASSWORD"), "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("SMTP_SENDER"), "SMTP sender")
 
+	// CORS configuration
+	flag.Func("cors-trusted-origins", "Trusted origins (space separate)", func(vals string) error {
+		cfg.cors.trustedOrigins = strings.Fields(vals)
+		return nil
+	})
+
 	flag.Parse()
+
+	// try to get from the env, if it is not passed as arg
+	if len(cfg.cors.trustedOrigins) == 0 {
+		cfg.cors.trustedOrigins = strings.Fields(os.Getenv("CORS_TRUSTED_ORIGINS"))
+	}
 
 	// write to stdout and Logs >= LevelInfo
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,13 +17,13 @@ import (
 
 func (app *application) rateLimit(next http.Handler) http.Handler {
 	type client struct {
-		limiter *rate.Limiter
+		limiter  *rate.Limiter
 		lastSeen time.Time
 	}
 
 	// will be acessed via closure :)
 	var (
-		mu sync.Mutex
+		mu      sync.Mutex
 		clients = make(map[string]*client) // key = ip
 	)
 
@@ -56,9 +57,9 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 			return
 		}
 
-		// locking access to the clients map. 
-		// using defer to unlock is avoided here because it would delay unlocking 
-		// until all middlewares in the chain have completed. this could slow down 
+		// locking access to the clients map.
+		// using defer to unlock is avoided here because it would delay unlocking
+		// until all middlewares in the chain have completed. this could slow down
 		// server access if there is a heavy operation in the chain
 		mu.Lock()
 
@@ -84,7 +85,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 }
 
-func (app *application) recoverPanic(next http.Handler) http.Handler  {
+func (app *application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// a defered function will always run in case of early exit (panic)
 		// in the stack
@@ -149,7 +150,6 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 	})
 }
 
-
 func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := app.userFromRequestContext(r)
@@ -200,4 +200,24 @@ func (app *application) requirePermission(permission string, next http.HandlerFu
 	})
 
 	return app.requireActivatedUser(fn)
+}
+
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Origin")
+
+		// get the origin of the request from the header
+		origin := r.Header.Get("Origin")
+
+		// only run if theres atleast one trusted origin configured and thee
+		// origin header is not empty
+		if len(app.config.cors.trustedOrigins) > 0 && origin != "" {
+			// reflect the origin back to the client if it is present in the trusted origins
+			if (slices.Contains(app.config.cors.trustedOrigins, origin)) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
