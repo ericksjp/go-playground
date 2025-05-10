@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -32,10 +33,12 @@ func (app *application) routes() http.Handler {
 
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/auth", app.createAuthTokenHandler)
 
+	router.Handler(http.MethodGet, "/debug/vars", expvar.Handler())
+
 	if (!app.config.limiter.enabled) {
-		return app.recoverPanic(app.enableCORS(app.authenticate(router)))
+		return app.metrics(app.recoverPanic(app.enableCORS(app.authenticate(router))))
 	}
 
 	// wrap the router with the recover panic/rateLimit/authenticate middlewares
-	return app.recoverPanic(app.rateLimit(app.enableCORS(app.authenticate(router))))
+	return app.metrics(app.recoverPanic(app.rateLimit(app.enableCORS(app.authenticate(router)))))
 }

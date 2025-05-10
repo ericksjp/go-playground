@@ -2,16 +2,19 @@ package main
 
 import (
 	"errors"
+	"expvar"
 	"fmt"
 	"net"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ericksjp703/greenlight/internal/data"
 	"github.com/ericksjp703/greenlight/internal/validator"
+	"github.com/felixge/httpsnoop"
 	"golang.org/x/time/rate"
 )
 
@@ -82,7 +85,6 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
-
 }
 
 func (app *application) recoverPanic(next http.Handler) http.Handler {
@@ -215,7 +217,7 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 		// origin header is not empty
 		if len(app.config.cors.trustedOrigins) > 0 && origin != "" {
 			// reflect the origin back to the client if it is present in the trusted origins
-			if (slices.Contains(app.config.cors.trustedOrigins, origin)) {
+			if slices.Contains(app.config.cors.trustedOrigins, origin) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 
 				// treat the request as a preflight request
@@ -232,5 +234,46 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) metrics(next http.Handler) http.Handler {
+	// initialize expvar variables (they are thread safe)
+	totalRequestsReceived := expvar.NewInt("total_requests_received")
+	totalResponsesSent := expvar.NewInt("total_responses_send")
+	requestsPerSecond := expvar.NewFloat("requests_per_second")
+	totalProcessingTimeMicros := expvar.NewInt("total_processing_time_microsseconds")
+	averageProcessingTimeMicros := expvar.NewInt("average_processing_time_microsseconds")
+	totalResponsesSentByStatus := expvar.NewMap("total_responses_sent_by_status")
+
+	// used to compute the rps
+	startTime := time.Now()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// increment the requests received
+		totalRequestsReceived.Add(1)
+
+		// wrap the next call into httpsnoop method to get metrics
+		metrics := httpsnoop.CaptureMetrics(next, w, r)
+
+		// increment the responses send
+		totalResponsesSent.Add(1)
+
+		// gets the request processing time from httpsnoop struct and
+		// increment the total processing time
+		totalProcessingTimeMicros.Add(metrics.Duration.Microseconds())
+
+		// update the map, incrementing by the status code
+		totalResponsesSentByStatus.Add(strconv.Itoa(metrics.Code), 1)
+
+		requestCount := totalRequestsReceived.Value()
+		if requestCount > 0 {
+			averageProcessingTimeMicros.Set(totalProcessingTimeMicros.Value() / requestCount)
+		}
+
+		elapsedSeconds := time.Since(startTime).Seconds()
+		if elapsedSeconds > 0 {
+			requestsPerSecond.Set(float64(requestCount) / elapsedSeconds)
+		}
 	})
 }
